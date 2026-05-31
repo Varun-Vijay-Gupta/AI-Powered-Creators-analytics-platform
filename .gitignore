@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.env
+*.log
+tmp/
+.embedding-cache/
+uploads/
+.DS_Store
