@@ -105,3 +105,8 @@ QDRANT_URL=
 ```
 
 A complete example is available in .env.example.
+
+Frontend: https://ai-powered-creators-analytics-platf.vercel.app/
+backend: https://ai-powered-creators-analytics-platform.onrender.com/
+
+Production deployments may encounter rate limits from YouTube when using yt-dlp on shared cloud infrastructure. The local setup provides the most reliable demonstration of the full pipeline.
