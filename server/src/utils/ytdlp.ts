@@ -110,9 +110,9 @@ function classifyCommandError(cmd: string, detail: string): AppError {
 export async function runCommand(
   cmd: string,
   args: string[],
-  opts?: { cwd?: string; timeoutMs?: number; pathDir?: string }
+  opts?: { cwd?: string; timeoutMs?: number; pathDir?: string; env?: NodeJS.ProcessEnv }
 ): Promise<{ stdout: string; stderr: string }> {
-  const env = childEnv(opts?.pathDir ?? resolveFfmpegDir() ?? undefined);
+  const env = { ...childEnv(opts?.pathDir ?? resolveFfmpegDir() ?? undefined), ...opts?.env };
 
   const run = (): Promise<{ stdout: string; stderr: string }> =>
     new Promise((resolve, reject) => {

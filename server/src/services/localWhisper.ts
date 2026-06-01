@@ -10,6 +10,14 @@ interface WhisperJson {
   segments?: { start: number; end: number; text: string }[];
 }
 
+/** Whisper on Windows defaults to cp1252; emoji in lyrics crash before JSON is written. */
+function whisperChildEnv(): NodeJS.ProcessEnv {
+  return {
+    PYTHONUTF8: "1",
+    PYTHONIOENCODING: "utf-8",
+  };
+}
+
 function discoverWhisperExe(): string | null {
   if (process.platform !== "win32") return null;
 
@@ -39,11 +47,35 @@ async function resolveLocalWhisper(): Promise<{ executable: string; baseArgs: st
   if (discovered) return { executable: discovered, baseArgs: [] };
 
   try {
-    await runCommand("py", ["-c", "import whisper"], { timeoutMs: 15_000 });
+    await runCommand("py", ["-c", "import whisper"], {
+      timeoutMs: 15_000,
+      env: whisperChildEnv(),
+    });
     return { executable: "py", baseArgs: ["-m", "whisper"] };
   } catch {
     return null;
   }
+}
+
+function findWhisperJson(outDir: string, base: string): string | null {
+  const expected = path.join(outDir, `${base}.json`);
+  if (fs.existsSync(expected)) return expected;
+
+  const candidates = fs
+    .readdirSync(outDir)
+    .filter((name) => name.endsWith(".json") && name.startsWith(base))
+    .map((name) => path.join(outDir, name));
+
+  return candidates[0] ?? null;
+}
+
+function whisperFailureDetail(stderr: string, stdout: string): string {
+  const combined = `${stderr}\n${stdout}`.trim();
+  if (/UnicodeEncodeError|charmap codec/i.test(combined)) {
+    return "Whisper crashed on Windows console encoding (emoji in audio). Restart the server after updating.";
+  }
+  const tail = combined.split(/\r?\n/).slice(-6).join(" ").trim();
+  return tail || "no stderr from Whisper";
 }
 
 export async function transcribeWithLocalWhisper(audioPath: string): Promise<TranscriptSegment[]> {
@@ -58,7 +90,7 @@ export async function transcribeWithLocalWhisper(audioPath: string): Promise<Tra
   const outDir = path.dirname(audioPath);
   const base = path.basename(audioPath, path.extname(audioPath));
 
-  await runCommand(
+  const { stdout, stderr } = await runCommand(
     inv.executable,
     [
       ...inv.baseArgs,
@@ -69,15 +101,20 @@ export async function transcribeWithLocalWhisper(audioPath: string): Promise<Tra
       "json",
       "--output_dir",
       outDir,
+      "--device",
+      "cpu",
       "--fp16",
       "False",
     ],
-    { timeoutMs: 600_000 }
+    { timeoutMs: 600_000, env: whisperChildEnv() }
   );
 
-  const jsonPath = path.join(outDir, `${base}.json`);
-  if (!fs.existsSync(jsonPath)) {
-    throw new AppError(502, "Local Whisper did not produce a JSON transcript.");
+  const jsonPath = findWhisperJson(outDir, base);
+  if (!jsonPath) {
+    throw new AppError(
+      502,
+      `Local Whisper did not produce a JSON transcript. ${whisperFailureDetail(stderr, stdout)}`
+    );
   }
 
   const data = JSON.parse(fs.readFileSync(jsonPath, "utf-8")) as WhisperJson;
