@@ -18,8 +18,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 async function bootstrap() {
   requireApiKeys();
 
+  try {
   await resolveYtDlp();
   resolveFfmpegDir();
+  console.log("yt-dlp and ffmpeg detected");
+} catch (error) {
+  console.warn(
+    "yt-dlp/ffmpeg not found during startup. Video extraction features may be unavailable until configured."
+  );
+}
   await initEmbeddings();
   await pingQdrant();
   console.log(`Qdrant connected: ${config.qdrantUrl}`);
