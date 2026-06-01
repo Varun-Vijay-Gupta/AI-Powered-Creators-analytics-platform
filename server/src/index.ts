@@ -30,7 +30,7 @@ async function bootstrap() {
   await pingQdrant();
   console.log(`Qdrant connected: ${config.qdrantUrl}`);
 
-  const schemaPath = path.join(__dirname, "db", "schema.sql");
+  const schemaPath = path.resolve(process.cwd(), "src/db/schema.sql");
   const schema = fs.readFileSync(schemaPath, "utf-8");
   await pool.query(schema);
   await ensureCollection();
